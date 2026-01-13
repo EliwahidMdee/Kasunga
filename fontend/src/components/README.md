@@ -1,0 +1,1 @@
+Component library lives here. Extract UI pieces from App.js into dedicated components as needed (forms, cards, layout, etc.).

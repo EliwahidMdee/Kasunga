@@ -22,6 +22,7 @@ source venv/bin/activate       # Mac/Linux
 
 # 3. Install dependencies (only first time)
 pip install -r requirements.txt
+# Note: Uses PyMySQL to connect to XAMPP MySQL (no mysqlclient needed)
 
 # 4. Create .env file (only first time)
 # Paste this into backend/config/.env:
@@ -180,7 +181,7 @@ Added via admin panel
 | Problem | Solution |
 |---------|----------|
 | MySQL won't connect | Start XAMPP, click MySQL start |
-| ImportError: mysqlclient | `pip install mysqlclient` |
+| ImportError: No module named 'pymysql' | `pip install PyMySQL==1.1.0` |
 | npm install fails | `rm -rf node_modules` then `npm install` |
 | Port 8000 in use | Change in settings.py or stop other Django |
 | Port 3000 in use | `npm start` will ask for different port |

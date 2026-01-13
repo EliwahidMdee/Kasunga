@@ -1,8 +1,11 @@
 from rest_framework import viewsets, status
-from rest_framework.decorators import action
+from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated, AllowAny
+from rest_framework.permissions import IsAuthenticated, AllowAny, IsAdminUser
+from rest_framework.authtoken.models import Token
+from django.contrib.auth import authenticate
 from django.contrib.auth.models import User
+from django.db.models import Count, Sum, Avg, Q
 from api.models import (
     UserPreference, Destination, Hotel, Transport, 
     TravelPlan, Itinerary
@@ -12,7 +15,8 @@ from api.serializers import (
     HotelSerializer, TransportSerializer, TravelPlanSerializer,
     ItinerarySerializer
 )
-from datetime import timedelta
+from datetime import timedelta, datetime
+from decimal import Decimal
 
 
 # ==================== RULE-BASED RECOMMENDATION ENGINE ====================
@@ -141,23 +145,156 @@ class RecommendationEngine:
         return itinerary_template
 
 
+# ==================== AUTHENTICATION VIEWS ====================
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def login_view(request):
+    """
+    User login endpoint - returns token on successful authentication
+    Body: username, password
+    """
+    username = request.data.get('username')
+    password = request.data.get('password')
+    
+    if not username or not password:
+        return Response(
+            {'error': 'Username and password are required'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    
+    user = authenticate(username=username, password=password)
+    
+    if user is None:
+        return Response(
+            {'error': 'Invalid credentials'},
+            status=status.HTTP_401_UNAUTHORIZED
+        )
+    
+    # Get or create token
+    token, created = Token.objects.get_or_create(user=user)
+    
+    return Response({
+        'token': token.key,
+        'user_id': user.id,
+        'username': user.username,
+        'email': user.email,
+        'message': 'Login successful'
+    })
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def logout_view(request):
+    """
+    User logout endpoint - deletes the user's token
+    """
+    try:
+        request.user.auth_token.delete()
+        return Response({'message': 'Logout successful'})
+    except Exception as e:
+        return Response(
+            {'error': str(e)},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def change_password_view(request):
+    """
+    Change user password
+    Body: old_password, new_password
+    """
+    old_password = request.data.get('old_password')
+    new_password = request.data.get('new_password')
+    
+    if not old_password or not new_password:
+        return Response(
+            {'error': 'Both old and new passwords are required'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    
+    user = request.user
+    
+    if not user.check_password(old_password):
+        return Response(
+            {'error': 'Old password is incorrect'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    
+    user.set_password(new_password)
+    user.save()
+    
+    # Update token
+    Token.objects.filter(user=user).delete()
+    token = Token.objects.create(user=user)
+    
+    return Response({
+        'message': 'Password changed successfully',
+        'token': token.key
+    })
+
+
 # ==================== VIEWSETS ====================
 
 class UserViewSet(viewsets.ModelViewSet):
     """User registration and profile management"""
     queryset = User.objects.all()
     serializer_class = UserSerializer
-    permission_classes = [AllowAny]
+    
+    def get_permissions(self):
+        """Allow anyone to register, but require auth for profile"""
+        if self.action == 'create':
+            return [AllowAny()]
+        return [IsAuthenticated()]
     
     def create(self, request, *args, **kwargs):
         """Handle user registration"""
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         self.perform_create(serializer)
+        
+        # Create token for the new user
+        user = User.objects.get(username=serializer.data['username'])
+        token = Token.objects.create(user=user)
+        
         return Response(
-            {'message': 'User registered successfully', 'user': serializer.data},
+            {
+                'message': 'User registered successfully',
+                'user': serializer.data,
+                'token': token.key
+            },
             status=status.HTTP_201_CREATED
         )
+    
+    @action(detail=False, methods=['get'])
+    def profile(self, request):
+        """Get current user's profile"""
+        serializer = self.get_serializer(request.user)
+        return Response(serializer.data)
+    
+    @action(detail=False, methods=['patch'])
+    def update_profile(self, request):
+        """Update current user's profile"""
+        user = request.user
+        serializer = self.get_serializer(user, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response({
+            'message': 'Profile updated successfully',
+            'user': serializer.data
+        })
+    
+    @action(detail=False, methods=['delete'])
+    def delete_account(self, request):
+        """Delete current user's account"""
+        user = request.user
+        username = user.username
+        user.delete()
+        return Response({
+            'message': f'Account {username} deleted successfully'
+        })
 
 
 class UserPreferenceViewSet(viewsets.ModelViewSet):
@@ -413,3 +550,431 @@ class ItineraryViewSet(viewsets.ModelViewSet):
         # Users see itineraries for their travel plans
         return Itinerary.objects.filter(travel_plan__user=self.request.user)
 
+
+# ==================== BUDGET TRACKING VIEWS ====================
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def budget_summary(request):
+    """
+    Get budget summary for user's travel plans
+    Shows total planned budget, spent budget, and remaining budget
+    """
+    user = request.user
+    travel_plans = TravelPlan.objects.filter(user=user)
+    
+    total_budget = Decimal('0.00')
+    total_spent = Decimal('0.00')
+    
+    plans_data = []
+    for plan in travel_plans:
+        # Calculate plan budget
+        plan_budget = Decimal(str(plan.budget)) if plan.budget else Decimal('0.00')
+        
+        # Calculate estimated costs
+        hotel_cost = Decimal('0.00')
+        transport_cost = Decimal('0.00')
+        
+        if plan.hotel:
+            nights = (plan.return_date - plan.travel_date).days
+            hotel_cost = Decimal(str(plan.hotel.price_per_night)) * nights * plan.num_travelers
+        
+        if plan.transport:
+            transport_cost = Decimal(str(plan.transport.price)) * plan.num_travelers
+        
+        estimated_spent = hotel_cost + transport_cost
+        remaining = plan_budget - estimated_spent
+        
+        plans_data.append({
+            'plan_id': plan.id,
+            'destination': plan.destination.name if plan.destination else 'N/A',
+            'budget': float(plan_budget),
+            'estimated_spent': float(estimated_spent),
+            'remaining': float(remaining),
+            'hotel_cost': float(hotel_cost),
+            'transport_cost': float(transport_cost)
+        })
+        
+        total_budget += plan_budget
+        total_spent += estimated_spent
+    
+    return Response({
+        'total_budget': float(total_budget),
+        'total_estimated_spent': float(total_spent),
+        'total_remaining': float(total_budget - total_spent),
+        'plans': plans_data
+    })
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def budget_breakdown(request, plan_id):
+    """
+    Get detailed budget breakdown for a specific travel plan
+    """
+    try:
+        plan = TravelPlan.objects.get(id=plan_id, user=request.user)
+    except TravelPlan.DoesNotExist:
+        return Response(
+            {'error': 'Travel plan not found'},
+            status=status.HTTP_404_NOT_FOUND
+        )
+    
+    nights = (plan.return_date - plan.travel_date).days
+    
+    breakdown = {
+        'plan_id': plan.id,
+        'destination': plan.destination.name if plan.destination else 'N/A',
+        'total_budget': float(plan.budget) if plan.budget else 0.0,
+        'travelers': plan.num_travelers,
+        'nights': nights,
+        'costs': {
+            'hotel': {
+                'name': plan.hotel.name if plan.hotel else 'N/A',
+                'price_per_night': float(plan.hotel.price_per_night) if plan.hotel else 0.0,
+                'nights': nights,
+                'travelers': plan.num_travelers,
+                'total': float(Decimal(str(plan.hotel.price_per_night)) * nights * plan.num_travelers) if plan.hotel else 0.0
+            },
+            'transport': {
+                'name': plan.transport.name if plan.transport else 'N/A',
+                'price_per_person': float(plan.transport.price) if plan.transport else 0.0,
+                'travelers': plan.num_travelers,
+                'total': float(Decimal(str(plan.transport.price)) * plan.num_travelers) if plan.transport else 0.0
+            }
+        }
+    }
+    
+    total_spent = breakdown['costs']['hotel']['total'] + breakdown['costs']['transport']['total']
+    breakdown['total_estimated_spent'] = total_spent
+    breakdown['remaining_budget'] = breakdown['total_budget'] - total_spent
+    
+    return Response(breakdown)
+
+
+# ==================== DASHBOARD VIEWS ====================
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def dashboard_stats(request):
+    """
+    Get dashboard statistics for the current user
+    Shows overview of travel plans, preferences, and recommendations
+    """
+    user = request.user
+    
+    # User stats
+    travel_plans = TravelPlan.objects.filter(user=user)
+    total_plans = travel_plans.count()
+    
+    # Upcoming and past trips
+    today = datetime.now().date()
+    upcoming_trips = travel_plans.filter(travel_date__gte=today).count()
+    past_trips = travel_plans.filter(return_date__lt=today).count()
+    
+    # Budget statistics
+    total_budget = travel_plans.aggregate(total=Sum('budget'))['total'] or 0
+    
+    # Preferences
+    try:
+        preferences = UserPreference.objects.get(user=user)
+        has_preferences = True
+        preferred_budget = preferences.budget
+        preferred_interest = preferences.interest
+    except UserPreference.DoesNotExist:
+        has_preferences = False
+        preferred_budget = None
+        preferred_interest = None
+    
+    # Recent destinations visited
+    recent_destinations = travel_plans.filter(
+        return_date__lt=today
+    ).order_by('-return_date')[:5].values_list('destination__name', flat=True)
+    
+    # Recommendations available
+    if has_preferences:
+        recommended_destinations = RecommendationEngine.recommend_destinations(
+            preferred_budget, preferred_interest
+        ).count()
+    else:
+        recommended_destinations = 0
+    
+    return Response({
+        'user': {
+            'username': user.username,
+            'email': user.email,
+            'member_since': user.date_joined
+        },
+        'statistics': {
+            'total_plans': total_plans,
+            'upcoming_trips': upcoming_trips,
+            'past_trips': past_trips,
+            'total_budget_planned': float(total_budget)
+        },
+        'preferences': {
+            'has_preferences': has_preferences,
+            'budget': preferred_budget,
+            'interest': preferred_interest
+        },
+        'recent_destinations': list(recent_destinations),
+        'recommendations_available': recommended_destinations
+    })
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def upcoming_trips(request):
+    """Get user's upcoming trips"""
+    today = datetime.now().date()
+    plans = TravelPlan.objects.filter(
+        user=request.user,
+        travel_date__gte=today
+    ).order_by('travel_date')
+    
+    serializer = TravelPlanSerializer(plans, many=True)
+    return Response({
+        'count': plans.count(),
+        'trips': serializer.data
+    })
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def past_trips(request):
+    """Get user's past trips"""
+    today = datetime.now().date()
+    plans = TravelPlan.objects.filter(
+        user=request.user,
+        return_date__lt=today
+    ).order_by('-return_date')
+    
+    serializer = TravelPlanSerializer(plans, many=True)
+    return Response({
+        'count': plans.count(),
+        'trips': serializer.data
+    })
+
+
+# ==================== ADMIN MANAGEMENT VIEWS ====================
+
+@api_view(['GET'])
+@permission_classes([IsAdminUser])
+def admin_dashboard(request):
+    """
+    Admin dashboard with system-wide statistics
+    """
+    # User statistics
+    total_users = User.objects.count()
+    users_with_preferences = UserPreference.objects.count()
+    users_with_plans = TravelPlan.objects.values('user').distinct().count()
+    
+    # Travel plan statistics
+    total_plans = TravelPlan.objects.count()
+    total_itineraries = Itinerary.objects.count()
+    
+    # Content statistics
+    total_destinations = Destination.objects.count()
+    total_hotels = Hotel.objects.count()
+    total_transport = Transport.objects.count()
+    
+    # Budget statistics
+    total_budget_value = TravelPlan.objects.aggregate(total=Sum('budget'))['total'] or 0
+    avg_budget = TravelPlan.objects.aggregate(avg=Avg('budget'))['avg'] or 0
+    
+    # Popular destinations
+    popular_destinations = TravelPlan.objects.values(
+        'destination__name'
+    ).annotate(
+        count=Count('id')
+    ).order_by('-count')[:5]
+    
+    # Recent activity
+    recent_plans = TravelPlan.objects.order_by('-created_at')[:10].values(
+        'id', 'user__username', 'destination__name', 'travel_date', 'created_at'
+    )
+    
+    return Response({
+        'users': {
+            'total': total_users,
+            'with_preferences': users_with_preferences,
+            'with_plans': users_with_plans
+        },
+        'travel_plans': {
+            'total': total_plans,
+            'total_itineraries': total_itineraries
+        },
+        'content': {
+            'destinations': total_destinations,
+            'hotels': total_hotels,
+            'transport_options': total_transport
+        },
+        'budget': {
+            'total_value': float(total_budget_value),
+            'average': float(avg_budget)
+        },
+        'popular_destinations': list(popular_destinations),
+        'recent_activity': list(recent_plans)
+    })
+
+
+@api_view(['GET'])
+@permission_classes([IsAdminUser])
+def admin_users_list(request):
+    """
+    List all users with their statistics
+    """
+    users = User.objects.all()
+    users_data = []
+    
+    for user in users:
+        plans_count = TravelPlan.objects.filter(user=user).count()
+        has_preferences = UserPreference.objects.filter(user=user).exists()
+        
+        users_data.append({
+            'id': user.id,
+            'username': user.username,
+            'email': user.email,
+            'is_staff': user.is_staff,
+            'is_active': user.is_active,
+            'date_joined': user.date_joined,
+            'travel_plans_count': plans_count,
+            'has_preferences': has_preferences
+        })
+    
+    return Response({
+        'count': len(users_data),
+        'users': users_data
+    })
+
+
+@api_view(['GET'])
+@permission_classes([IsAdminUser])
+def admin_user_details(request, user_id):
+    """
+    Get detailed information about a specific user
+    """
+    try:
+        user = User.objects.get(id=user_id)
+    except User.DoesNotExist:
+        return Response(
+            {'error': 'User not found'},
+            status=status.HTTP_404_NOT_FOUND
+        )
+    
+    # Get user's preferences
+    try:
+        preferences = UserPreference.objects.get(user=user)
+        preferences_data = UserPreferenceSerializer(preferences).data
+    except UserPreference.DoesNotExist:
+        preferences_data = None
+    
+    # Get user's travel plans
+    plans = TravelPlan.objects.filter(user=user)
+    plans_data = TravelPlanSerializer(plans, many=True).data
+    
+    return Response({
+        'user': {
+            'id': user.id,
+            'username': user.username,
+            'email': user.email,
+            'is_staff': user.is_staff,
+            'is_active': user.is_active,
+            'date_joined': user.date_joined
+        },
+        'preferences': preferences_data,
+        'travel_plans': {
+            'count': plans.count(),
+            'plans': plans_data
+        }
+    })
+
+
+@api_view(['GET'])
+@permission_classes([IsAdminUser])
+def admin_all_travel_plans(request):
+    """
+    Get all travel plans across all users
+    """
+    plans = TravelPlan.objects.select_related(
+        'user', 'destination', 'hotel', 'transport'
+    ).all().order_by('-created_at')
+    
+    plans_data = []
+    for plan in plans:
+        plans_data.append({
+            'id': plan.id,
+            'user': plan.user.username,
+            'destination': plan.destination.name if plan.destination else None,
+            'hotel': plan.hotel.name if plan.hotel else None,
+            'transport': plan.transport.name if plan.transport else None,
+            'travel_date': plan.travel_date,
+            'return_date': plan.return_date,
+            'budget': float(plan.budget) if plan.budget else 0,
+            'num_travelers': plan.num_travelers,
+            'created_at': plan.created_at
+        })
+    
+    return Response({
+        'count': len(plans_data),
+        'plans': plans_data
+    })
+
+
+@api_view(['GET'])
+@permission_classes([IsAdminUser])
+def admin_preferences_tracking(request):
+    """
+    Track and analyze user preferences across the system
+    """
+    preferences = UserPreference.objects.all()
+    
+    # Budget distribution
+    budget_distribution = preferences.values('budget').annotate(
+        count=Count('id')
+    ).order_by('budget')
+    
+    # Interest distribution
+    interest_distribution = preferences.values('interest').annotate(
+        count=Count('id')
+    ).order_by('interest')
+    
+    # Country preferences
+    country_preferences = preferences.values('preferred_country').annotate(
+        count=Count('id')
+    ).order_by('-count')
+    
+    # Traveler size distribution
+    travelers_distribution = preferences.values('num_travelers').annotate(
+        count=Count('id')
+    ).order_by('num_travelers')
+    
+    return Response({
+        'total_preferences': preferences.count(),
+        'budget_distribution': list(budget_distribution),
+        'interest_distribution': list(interest_distribution),
+        'country_preferences': list(country_preferences),
+        'travelers_distribution': list(travelers_distribution)
+    })
+
+
+@api_view(['POST'])
+@permission_classes([IsAdminUser])
+def admin_toggle_user_status(request, user_id):
+    """
+    Activate or deactivate a user account
+    """
+    try:
+        user = User.objects.get(id=user_id)
+    except User.DoesNotExist:
+        return Response(
+            {'error': 'User not found'},
+            status=status.HTTP_404_NOT_FOUND
+        )
+    
+    user.is_active = not user.is_active
+    user.save()
+    
+    return Response({
+        'message': f'User {user.username} is now {"active" if user.is_active else "inactive"}',
+        'is_active': user.is_active
+    })

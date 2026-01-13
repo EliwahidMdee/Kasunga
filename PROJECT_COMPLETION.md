@@ -59,15 +59,15 @@ A complete, production-ready travel planning and recommendation system has been 
 
 ### User Management
 - ✅ User registration with validation
-- ✅ User authentication (token-based)
-- ✅ User profile management
-- ✅ Password hashing
+- ✅ User authentication (token-based with login/logout views)
+- ✅ User profile management (view, edit, delete)
+- ✅ Password hashing and password change functionality
 
 ### Travel Planning
 - ✅ Set travel preferences (budget, interests, travelers)
 - ✅ Multi-step trip planning interface
 - ✅ Travel date management
-- ✅ Budget tracking
+- ✅ Budget tracking with summary and breakdown views
 
 ### Rule-Based Recommendations
 - ✅ Destination recommendations (by budget + interest + country)
@@ -76,22 +76,32 @@ A complete, production-ready travel planning and recommendation system has been 
 - ✅ Itinerary generation (by trip duration)
 
 ### Admin Management
-- ✅ Manage destinations
-- ✅ Manage hotels
-- ✅ Manage transport options
-- ✅ View user travel plans
-- ✅ User management
-- ✅ Preference tracking
+- ✅ Manage destinations (Django admin + custom API)
+- ✅ Manage hotels (Django admin + custom API)
+- ✅ Manage transport options (Django admin + custom API)
+- ✅ View all user travel plans (admin dashboard)
+- ✅ User management (list, details, toggle status)
+- ✅ Preference tracking and analytics
 
 ### User Interface
 - ✅ Landing page (non-authenticated)
-- ✅ Registration form
-- ✅ Login form
-- ✅ Preference settings
-- ✅ Trip planning wizard
-- ✅ Results display
-- ✅ Dashboard
+- ✅ Registration form with validation
+- ✅ Login form with authentication
+- ✅ Dashboard with statistics and quick actions
+- ✅ Preference settings form
+- ✅ Trip planning wizard (multi-step)
+- ✅ Budget tracker with summary and breakdown
+- ✅ User profile management page
+- ✅ Results display components
 - ✅ Responsive design (mobile, tablet, desktop)
+
+### Additional Features
+- ✅ Upcoming and past trips views
+- ✅ Detailed budget breakdown per trip
+- ✅ Password change functionality
+- ✅ Account deletion option
+- ✅ Admin analytics dashboard
+- ✅ Real-time budget calculations
 
 ---
 
@@ -142,16 +152,22 @@ A complete, production-ready travel planning and recommendation system has been 
 
 ## 🔌 API Endpoints
 
-### Total: 25+ Endpoints
+### Total: 40+ Endpoints
 
-#### Authentication (2)
+#### Authentication (7)
 - POST /api/users/ - Register
-- POST /api-auth/login/ - Login
+- POST /api/auth/login/ - Login
+- POST /api/auth/logout/ - Logout
+- POST /api/auth/change-password/ - Change password
+- GET /api/users/profile/ - Get current user profile
+- PATCH /api/users/update_profile/ - Update profile
+- DELETE /api/users/delete_account/ - Delete account
 
-#### Preferences (3)
-- GET /api/preferences/
+#### Preferences (4)
+- GET /api/preferences/ - List all preferences
 - POST /api/preferences/
 - PATCH /api/preferences/{id}/
+- GET /api/preferences/my_preferences/ - Get current user's preferences
 
 #### Destinations (3)
 - GET /api/destinations/
@@ -178,9 +194,26 @@ A complete, production-ready travel planning and recommendation system has been 
 - POST /api/travel-plans/{id}/generate_itinerary/
 
 #### Itineraries (3)
-- GET /api/itineraries/
-- GET /api/itineraries/{id}/
+- GET /api/itineraries/ - List user's itineraries
+- GET /api/itineraries/{id}/ - Get itinerary details
 - POST /api/itineraries/
+
+#### Budget Tracking (2)
+- GET /api/budget/summary/ - Get budget summary for all plans
+- GET /api/budget/breakdown/{plan_id}/ - Get detailed budget breakdown
+
+#### Dashboard (3)
+- GET /api/dashboard/stats/ - Get dashboard statistics
+- GET /api/dashboard/upcoming-trips/ - Get upcoming trips
+- GET /api/dashboard/past-trips/ - Get past trips
+
+#### Admin Management (6)
+- GET /api/admin/dashboard/ - Get admin dashboard statistics
+- GET /api/admin/users/ - List all users with stats
+- GET /api/admin/users/{id}/ - Get user details
+- POST /api/admin/users/{id}/toggle-status/ - Activate/deactivate user
+- GET /api/admin/travel-plans/ - Get all travel plans
+- GET /api/admin/preferences-tracking/ - Get preference analytics
 
 ---
 

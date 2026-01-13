@@ -14,6 +14,13 @@ from pathlib import Path
 import os
 from dotenv import load_dotenv
 
+# Configure PyMySQL as the MySQL driver
+import pymysql
+pymysql.install_as_MySQLdb()
+
+# Override version check for Django 6 compatibility
+pymysql.version_info = (2, 2, 1, "final", 0)
+
 load_dotenv()
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.

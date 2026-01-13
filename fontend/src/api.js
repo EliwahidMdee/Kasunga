@@ -30,14 +30,43 @@ export const registerUser = (userData) => {
   return api.post('/users/', userData);
 };
 
-// Login user (basic auth)
+// Login user
 export const loginUser = (username, password) => {
-  return api.post('/auth-token/', { username, password });
+  return api.post('/auth/login/', { username, password });
+};
+
+// Logout user
+export const logoutUser = () => {
+  return api.post('/auth/logout/');
+};
+
+// Change password
+export const changePassword = (oldPassword, newPassword) => {
+  return api.post('/auth/change-password/', {
+    old_password: oldPassword,
+    new_password: newPassword,
+  });
+};
+
+// Get current user profile
+export const getUserProfile = () => {
+  return api.get('/users/profile/');
+};
+
+// Update user profile
+export const updateUserProfile = (data) => {
+  return api.patch('/users/update_profile/', data);
+};
+
+// Delete user account
+export const deleteUserAccount = () => {
+  return api.delete('/users/delete_account/');
 };
 
 // Get user preferences
 export const getUserPreferences = () => {
   return api.get('/preferences/my_preferences/');
+};
 };
 
 // Update user preferences
@@ -158,6 +187,67 @@ export const getItineraries = () => {
 // Get itinerary details
 export const getItineraryDetail = (id) => {
   return api.get(`/itineraries/${id}/`);
+};
+
+// ==================== BUDGET TRACKING ENDPOINTS ====================
+
+// Get budget summary
+export const getBudgetSummary = () => {
+  return api.get('/budget/summary/');
+};
+
+// Get budget breakdown for a specific plan
+export const getBudgetBreakdown = (planId) => {
+  return api.get(`/budget/breakdown/${planId}/`);
+};
+
+// ==================== DASHBOARD ENDPOINTS ====================
+
+// Get dashboard statistics
+export const getDashboardStats = () => {
+  return api.get('/dashboard/stats/');
+};
+
+// Get upcoming trips
+export const getUpcomingTrips = () => {
+  return api.get('/dashboard/upcoming-trips/');
+};
+
+// Get past trips
+export const getPastTrips = () => {
+  return api.get('/dashboard/past-trips/');
+};
+
+// ==================== ADMIN ENDPOINTS ====================
+
+// Get admin dashboard stats
+export const getAdminDashboard = () => {
+  return api.get('/admin/dashboard/');
+};
+
+// Get all users (admin)
+export const getAdminUsers = () => {
+  return api.get('/admin/users/');
+};
+
+// Get user details (admin)
+export const getAdminUserDetails = (userId) => {
+  return api.get(`/admin/users/${userId}/`);
+};
+
+// Toggle user status (admin)
+export const toggleUserStatus = (userId) => {
+  return api.post(`/admin/users/${userId}/toggle-status/`);
+};
+
+// Get all travel plans (admin)
+export const getAdminTravelPlans = () => {
+  return api.get('/admin/travel-plans/');
+};
+
+// Get preferences tracking (admin)
+export const getPreferencesTracking = () => {
+  return api.get('/admin/preferences-tracking/');
 };
 
 export default api;

@@ -1,6 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import './App.css';
-import * as api from './api';
+import * as api from './services/api';
+import LoginPage from './pages/LoginPage';
+import RegisterPage from './pages/RegisterPage';
+import { useAuth } from './context/AuthContext';
 
 // ==================== COMPONENTS ====================
 
@@ -402,24 +405,406 @@ const TravelPlanning = ({ preferences, onBack }) => {
   return null;
 };
 
+// Dashboard Component - Shows user statistics and quick actions
+const Dashboard = ({ onNavigate }) => {
+  const [stats, setStats] = useState(null);
+  const [upcomingTrips, setUpcomingTrips] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    fetchDashboardData();
+  }, []);
+
+  const fetchDashboardData = async () => {
+    try {
+      const [statsRes, tripsRes] = await Promise.all([
+        api.getDashboardStats(),
+        api.getUpcomingTrips(),
+      ]);
+      setStats(statsRes.data);
+      setUpcomingTrips(tripsRes.data.trips);
+    } catch (err) {
+      setError('Failed to load dashboard data');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading) return <div className="loading">Loading dashboard...</div>;
+  if (error) return <div className="error-message">{error}</div>;
+
+  return (
+    <div className="dashboard">
+      <h2>Welcome back, {stats?.user?.username}!</h2>
+      
+      <div className="stats-grid">
+        <div className="stat-card">
+          <h3>{stats?.statistics?.total_plans || 0}</h3>
+          <p>Total Plans</p>
+        </div>
+        <div className="stat-card">
+          <h3>{stats?.statistics?.upcoming_trips || 0}</h3>
+          <p>Upcoming Trips</p>
+        </div>
+        <div className="stat-card">
+          <h3>{stats?.statistics?.past_trips || 0}</h3>
+          <p>Past Trips</p>
+        </div>
+        <div className="stat-card">
+          <h3>${stats?.statistics?.total_budget_planned?.toFixed(2) || '0.00'}</h3>
+          <p>Total Budget</p>
+        </div>
+      </div>
+
+      <div className="dashboard-section">
+        <h3>Quick Actions</h3>
+        <div className="action-buttons">
+          <button onClick={() => onNavigate('planning')} className="btn-primary">
+            Plan New Trip
+          </button>
+          <button onClick={() => onNavigate('budget')} className="btn-secondary">
+            View Budget
+          </button>
+          <button onClick={() => onNavigate('preferences')} className="btn-secondary">
+            Update Preferences
+          </button>
+        </div>
+      </div>
+
+      {upcomingTrips.length > 0 && (
+        <div className="dashboard-section">
+          <h3>Upcoming Trips</h3>
+          <div className="trips-list">
+            {upcomingTrips.slice(0, 3).map((trip) => (
+              <div key={trip.id} className="trip-card">
+                <h4>{trip.destination_name || 'Destination'}</h4>
+                <p>Travel Date: {trip.travel_date}</p>
+                <p>Return Date: {trip.return_date}</p>
+                <p>Travelers: {trip.num_travelers}</p>
+                <p>Budget: ${trip.budget}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {stats?.preferences?.has_preferences === false && (
+        <div className="alert-box">
+          <p>⚠️ You haven't set your travel preferences yet!</p>
+          <button onClick={() => onNavigate('preferences')} className="btn-primary">
+            Set Preferences Now
+          </button>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// Budget Tracker Component - Shows budget summary and breakdowns
+const BudgetTracker = () => {
+  const [budgetSummary, setBudgetSummary] = useState(null);
+  const [selectedPlan, setSelectedPlan] = useState(null);
+  const [breakdown, setBreakdown] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    fetchBudgetSummary();
+  }, []);
+
+  const fetchBudgetSummary = async () => {
+    try {
+      const res = await api.getBudgetSummary();
+      setBudgetSummary(res.data);
+    } catch (err) {
+      setError('Failed to load budget data');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchBreakdown = async (planId) => {
+    try {
+      const res = await api.getBudgetBreakdown(planId);
+      setBreakdown(res.data);
+      setSelectedPlan(planId);
+    } catch (err) {
+      setError('Failed to load budget breakdown');
+    }
+  };
+
+  if (loading) return <div className="loading">Loading budget...</div>;
+  if (error) return <div className="error-message">{error}</div>;
+
+  return (
+    <div className="budget-tracker">
+      <h2>Budget Tracker</h2>
+
+      <div className="budget-summary">
+        <h3>Overall Summary</h3>
+        <div className="stats-grid">
+          <div className="stat-card">
+            <h3>${budgetSummary?.total_budget?.toFixed(2) || '0.00'}</h3>
+            <p>Total Budget</p>
+          </div>
+          <div className="stat-card">
+            <h3>${budgetSummary?.total_estimated_spent?.toFixed(2) || '0.00'}</h3>
+            <p>Estimated Spent</p>
+          </div>
+          <div className="stat-card">
+            <h3>${budgetSummary?.total_remaining?.toFixed(2) || '0.00'}</h3>
+            <p>Remaining</p>
+          </div>
+        </div>
+      </div>
+
+      <div className="plans-budget">
+        <h3>Budget by Travel Plan</h3>
+        {budgetSummary?.plans?.length === 0 ? (
+          <p>No travel plans yet</p>
+        ) : (
+          <div className="plans-list">
+            {budgetSummary?.plans?.map((plan) => (
+              <div key={plan.plan_id} className="plan-budget-card">
+                <h4>{plan.destination}</h4>
+                <div className="budget-details">
+                  <p><strong>Budget:</strong> ${plan.budget.toFixed(2)}</p>
+                  <p><strong>Estimated:</strong> ${plan.estimated_spent.toFixed(2)}</p>
+                  <p><strong>Remaining:</strong> ${plan.remaining.toFixed(2)}</p>
+                </div>
+                <button 
+                  onClick={() => fetchBreakdown(plan.plan_id)} 
+                  className="btn-secondary"
+                >
+                  View Breakdown
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {breakdown && (
+        <div className="budget-breakdown">
+          <h3>Detailed Breakdown - {breakdown.destination}</h3>
+          <div className="breakdown-details">
+            <div className="breakdown-section">
+              <h4>Hotel Costs</h4>
+              <p>Hotel: {breakdown.costs.hotel.name}</p>
+              <p>Price per Night: ${breakdown.costs.hotel.price_per_night}</p>
+              <p>Nights: {breakdown.costs.hotel.nights}</p>
+              <p>Travelers: {breakdown.costs.hotel.travelers}</p>
+              <p><strong>Total: ${breakdown.costs.hotel.total.toFixed(2)}</strong></p>
+            </div>
+            <div className="breakdown-section">
+              <h4>Transport Costs</h4>
+              <p>Transport: {breakdown.costs.transport.name}</p>
+              <p>Price per Person: ${breakdown.costs.transport.price_per_person}</p>
+              <p>Travelers: {breakdown.costs.transport.travelers}</p>
+              <p><strong>Total: ${breakdown.costs.transport.total.toFixed(2)}</strong></p>
+            </div>
+            <div className="breakdown-section">
+              <h4>Summary</h4>
+              <p>Total Budget: ${breakdown.total_budget.toFixed(2)}</p>
+              <p>Total Spent: ${breakdown.total_estimated_spent.toFixed(2)}</p>
+              <p><strong>Remaining: ${breakdown.remaining_budget.toFixed(2)}</strong></p>
+            </div>
+          </div>
+          <button onClick={() => setBreakdown(null)} className="btn-secondary">
+            Close Breakdown
+          </button>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// User Profile Component - Manage profile and account settings
+const UserProfile = () => {
+  const [profile, setProfile] = useState(null);
+  const [editMode, setEditMode] = useState(false);
+  const [formData, setFormData] = useState({});
+  const [passwordData, setPasswordData] = useState({
+    oldPassword: '',
+    newPassword: '',
+    confirmPassword: '',
+  });
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+
+  useEffect(() => {
+    fetchProfile();
+  }, []);
+
+  const fetchProfile = async () => {
+    try {
+      const res = await api.getUserProfile();
+      setProfile(res.data);
+      setFormData({
+        first_name: res.data.first_name || '',
+        last_name: res.data.last_name || '',
+        email: res.data.email || '',
+      });
+    } catch (err) {
+      setError('Failed to load profile');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleUpdateProfile = async (e) => {
+    e.preventDefault();
+    setError('');
+    setSuccess('');
+    try {
+      await api.updateUserProfile(formData);
+      setSuccess('Profile updated successfully');
+      setEditMode(false);
+      fetchProfile();
+    } catch (err) {
+      setError('Failed to update profile');
+    }
+  };
+
+  const handleChangePassword = async (e) => {
+    e.preventDefault();
+    setError('');
+    setSuccess('');
+
+    if (passwordData.newPassword !== passwordData.confirmPassword) {
+      setError('New passwords do not match');
+      return;
+    }
+
+    try {
+      const res = await api.changePassword(passwordData.oldPassword, passwordData.newPassword);
+      localStorage.setItem('token', res.data.token);
+      setSuccess('Password changed successfully');
+      setPasswordData({ oldPassword: '', newPassword: '', confirmPassword: '' });
+    } catch (err) {
+      setError(err.response?.data?.error || 'Failed to change password');
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    if (window.confirm('Are you sure you want to delete your account? This action cannot be undone.')) {
+      try {
+        await api.deleteUserAccount();
+        localStorage.clear();
+        window.location.reload();
+      } catch (err) {
+        setError('Failed to delete account');
+      }
+    }
+  };
+
+  if (loading) return <div className="loading">Loading profile...</div>;
+
+  return (
+    <div className="user-profile">
+      <h2>My Profile</h2>
+      {error && <div className="error-message">{error}</div>}
+      {success && <div className="success-message">{success}</div>}
+
+      <div className="profile-section">
+        <h3>Profile Information</h3>
+        {!editMode ? (
+          <div className="profile-details">
+            <p><strong>Username:</strong> {profile?.username}</p>
+            <p><strong>Email:</strong> {profile?.email}</p>
+            <p><strong>First Name:</strong> {profile?.first_name || 'Not set'}</p>
+            <p><strong>Last Name:</strong> {profile?.last_name || 'Not set'}</p>
+            <button onClick={() => setEditMode(true)} className="btn-primary">
+              Edit Profile
+            </button>
+          </div>
+        ) : (
+          <form onSubmit={handleUpdateProfile} className="profile-form">
+            <input
+              type="text"
+              placeholder="First Name"
+              value={formData.first_name}
+              onChange={(e) => setFormData({ ...formData, first_name: e.target.value })}
+            />
+            <input
+              type="text"
+              placeholder="Last Name"
+              value={formData.last_name}
+              onChange={(e) => setFormData({ ...formData, last_name: e.target.value })}
+            />
+            <input
+              type="email"
+              placeholder="Email"
+              value={formData.email}
+              onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+              required
+            />
+            <div className="button-group">
+              <button type="submit" className="btn-primary">Save Changes</button>
+              <button type="button" onClick={() => setEditMode(false)} className="btn-secondary">
+                Cancel
+              </button>
+            </div>
+          </form>
+        )}
+      </div>
+
+      <div className="profile-section">
+        <h3>Change Password</h3>
+        <form onSubmit={handleChangePassword} className="profile-form">
+          <input
+            type="password"
+            placeholder="Current Password"
+            value={passwordData.oldPassword}
+            onChange={(e) => setPasswordData({ ...passwordData, oldPassword: e.target.value })}
+            required
+          />
+          <input
+            type="password"
+            placeholder="New Password"
+            value={passwordData.newPassword}
+            onChange={(e) => setPasswordData({ ...passwordData, newPassword: e.target.value })}
+            required
+          />
+          <input
+            type="password"
+            placeholder="Confirm New Password"
+            value={passwordData.confirmPassword}
+            onChange={(e) => setPasswordData({ ...passwordData, confirmPassword: e.target.value })}
+            required
+          />
+          <button type="submit" className="btn-primary">Change Password</button>
+        </form>
+      </div>
+
+      <div className="profile-section danger-zone">
+        <h3>Danger Zone</h3>
+        <p>Once you delete your account, there is no going back. Please be certain.</p>
+        <button onClick={handleDeleteAccount} className="btn-danger">
+          Delete Account
+        </button>
+      </div>
+    </div>
+  );
+};
+
 // ==================== MAIN APP COMPONENT ====================
 
 function App() {
+  const { isAuthenticated, login, logout } = useAuth();
   const [currentPage, setCurrentPage] = useState('landing');
-  const [isAuthenticated, setIsAuthenticated] = useState(!!localStorage.getItem('token'));
   const [showRegister, setShowRegister] = useState(false);
   const [preferences, setPreferences] = useState(null);
 
   useEffect(() => {
-    // Check if user is already logged in
-    if (localStorage.getItem('token')) {
-      setIsAuthenticated(true);
+    if (isAuthenticated) {
       setCurrentPage('dashboard');
     }
-  }, []);
+  }, [isAuthenticated]);
 
   const handleLoginSuccess = () => {
-    setIsAuthenticated(true);
     setCurrentPage('preferences');
   };
 
@@ -428,10 +813,7 @@ function App() {
   };
 
   const handleLogout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('username');
-    localStorage.removeItem('userId');
-    setIsAuthenticated(false);
+    logout();
     setCurrentPage('landing');
   };
 
@@ -446,8 +828,24 @@ function App() {
           <section className="hero">
             <h2>Plan Your Perfect Trip</h2>
             <p>Get personalized travel recommendations based on your preferences, budget, and interests.</p>
-            <button className="btn-primary large" onClick={() => setShowRegister(false)}>Login</button>
-            <button className="btn-secondary large" onClick={() => setShowRegister(true)}>Register</button>
+            <button
+              className="btn-primary large"
+              onClick={() => {
+                setShowRegister(false);
+                setCurrentPage('auth');
+              }}
+            >
+              Login
+            </button>
+            <button
+              className="btn-secondary large"
+              onClick={() => {
+                setShowRegister(true);
+                setCurrentPage('auth');
+              }}
+            >
+              Register
+            </button>
           </section>
           <section className="features">
             <h3>How It Works</h3>
@@ -476,43 +874,53 @@ function App() {
   }
 
   // Authentication pages
-  if (!isAuthenticated) {
+  if (!isAuthenticated && currentPage !== 'landing') {
     return showRegister ? (
-      <Register onSuccess={handleRegisterSuccess} onSwitchToLogin={() => setShowRegister(false)} />
+      <RegisterPage onSuccess={handleRegisterSuccess} onSwitchToLogin={() => setShowRegister(false)} />
     ) : (
-      <Login onSuccess={handleLoginSuccess} onSwitchToRegister={() => setShowRegister(true)} />
+      <LoginPage onSuccess={handleLoginSuccess} onSwitchToRegister={() => setShowRegister(true)} />
     );
   }
 
   // Authenticated user pages
   return (
-    <div className="app">
-      <header className="navbar">
-        <h1>✈️ Travel Planner</h1>
-        <nav className="nav-menu">
+    <div className="app-container">
+      <aside className="sidebar">
+        <div className="sidebar-header">
+          <h1>✈️ Travel Planner</h1>
+        </div>
+        <nav className="sidebar-nav">
           <button onClick={() => setCurrentPage('dashboard')} className={currentPage === 'dashboard' ? 'active' : ''}>
-            Dashboard
+            <span className="nav-icon">📊</span>
+            <span className="nav-text">Dashboard</span>
           </button>
           <button onClick={() => setCurrentPage('preferences')} className={currentPage === 'preferences' ? 'active' : ''}>
-            My Preferences
+            <span className="nav-icon">⚙️</span>
+            <span className="nav-text">My Preferences</span>
           </button>
           <button onClick={() => setCurrentPage('planning')} className={currentPage === 'planning' ? 'active' : ''}>
-            Plan Trip
+            <span className="nav-icon">✈️</span>
+            <span className="nav-text">Plan Trip</span>
           </button>
-          <button onClick={handleLogout} className="btn-logout">Logout</button>
+          <button onClick={() => setCurrentPage('budget')} className={currentPage === 'budget' ? 'active' : ''}>
+            <span className="nav-icon">💰</span>
+            <span className="nav-text">Budget</span>
+          </button>
+          <button onClick={() => setCurrentPage('profile')} className={currentPage === 'profile' ? 'active' : ''}>
+            <span className="nav-icon">👤</span>
+            <span className="nav-text">Profile</span>
+          </button>
         </nav>
-      </header>
+        <div className="sidebar-footer">
+          <button onClick={handleLogout} className="btn-logout">
+            <span className="nav-icon">🚪</span>
+            <span className="nav-text">Logout</span>
+          </button>
+        </div>
+      </aside>
 
       <main className="main-content">
-        {currentPage === 'dashboard' && (
-          <div className="dashboard">
-            <h2>Welcome back, {localStorage.getItem('username')}!</h2>
-            <p>Your travel planning dashboard</p>
-            <button onClick={() => setCurrentPage('planning')} className="btn-primary">
-              Start Planning a Trip
-            </button>
-          </div>
-        )}
+        {currentPage === 'dashboard' && <Dashboard onNavigate={setCurrentPage} />}
 
         {currentPage === 'preferences' && (
           <TravelPreference
@@ -529,6 +937,10 @@ function App() {
             onBack={() => setCurrentPage('dashboard')}
           />
         )}
+
+        {currentPage === 'budget' && <BudgetTracker />}
+
+        {currentPage === 'profile' && <UserProfile />}
       </main>
     </div>
   );
