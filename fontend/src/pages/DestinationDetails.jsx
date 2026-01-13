@@ -11,20 +11,20 @@ const DestinationDetails = () => {
   const [selectedImage, setSelectedImage] = useState(null);
 
   useEffect(() => {
-    loadDestination();
+    const fetchDestination = async () => {
+      try {
+        const response = await api.getDestinationDetail(id);
+        setDestination(response.data);
+        setSelectedImage(response.data.image_url);
+      } catch (err) {
+        setError('Failed to load destination details');
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    fetchDestination();
   }, [id]);
-
-  const loadDestination = async () => {
-    try {
-      const response = await api.getDestinationDetail(id);
-      setDestination(response.data);
-      setSelectedImage(response.data.image_url);
-    } catch (err) {
-      setError('Failed to load destination details');
-    } finally {
-      setLoading(false);
-    }
-  };
 
   if (loading) {
     return (
