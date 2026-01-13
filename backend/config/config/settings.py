@@ -89,7 +89,8 @@ CORS_ALLOW_CREDENTIALS = True
 # https://docs.djangoproject.com/en/6.0/ref/settings/#databases
 
 # Use SQLite for testing/development if USE_SQLITE is set, otherwise use MySQL
-if os.getenv('USE_SQLITE', 'False').lower() == 'true':
+use_sqlite = os.getenv('USE_SQLITE', 'false').lower() in ('true', '1', 'yes')
+if use_sqlite:
     DATABASES = {
         'default': {
             'ENGINE': 'django.db.backends.sqlite3',

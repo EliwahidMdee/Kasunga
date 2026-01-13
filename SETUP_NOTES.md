@@ -139,7 +139,7 @@ All API endpoints are working correctly:
 
 ### Install Dependencies
 ```bash
-cd fontend
+cd frontend
 npm install
 ```
 
@@ -154,7 +154,7 @@ Opens at `http://localhost:3000`
 npm run build
 ```
 
-The build is already tested and working. Production files are in `fontend/build/` directory.
+The build is already tested and working. Production files are in `frontend/build/` directory.
 
 ---
 
