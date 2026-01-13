@@ -53,15 +53,22 @@ export const createUserPreferences = (data) => api.post('/preferences/', data);
 
 export const getDestinations = () => api.get('/destinations/');
 
-export const getRecommendedDestinations = (budget, interest, country = null) => {
+export const getRecommendedDestinations = (budget, interest, country = null, budgetMin = null, budgetMax = null, objective = null, location = null) => {
   const params = {};
   if (budget) params.budget = budget;
   if (interest) params.interest = interest;
   if (country) params.country = country;
+  if (budgetMin) params.budget_min = budgetMin;
+  if (budgetMax) params.budget_max = budgetMax;
+  if (objective) params.objective = objective;
+  if (location) params.location = location;
   return api.get('/destinations/recommended/', { params });
 };
 
 export const getDestinationDetail = (id) => api.get(`/destinations/${id}/`);
+
+export const getDestinationImages = (destinationId) =>
+  api.get('/destination-images/', { params: { destination_id: destinationId } });
 
 // ==================== HOTEL ENDPOINTS ====================
 
