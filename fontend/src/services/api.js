@@ -145,4 +145,37 @@ export const getAdminTravelPlans = () => api.get('/admin/travel-plans/');
 
 export const getPreferencesTracking = () => api.get('/admin/preferences-tracking/');
 
+// ==================== ADMIN CONTENT MANAGEMENT ====================
+
+export const getAdminDestinations = () => api.get('/admin/destinations/');
+
+export const createAdminDestination = (data) => api.post('/admin/destinations/', data);
+
+export const getAdminDestinationDetail = (destinationId) => api.get(`/admin/destinations/${destinationId}/`);
+
+export const updateAdminDestination = (destinationId, data) =>
+  api.patch(`/admin/destinations/${destinationId}/`, data);
+
+export const deleteAdminDestination = (destinationId) => api.delete(`/admin/destinations/${destinationId}/`);
+
+export const getAdminHotels = () => api.get('/admin/hotels/');
+
+export const createAdminHotel = (data) => api.post('/admin/hotels/', data);
+
+export const getAdminHotelDetail = (hotelId) => api.get(`/admin/hotels/${hotelId}/`);
+
+export const updateAdminHotel = (hotelId, data) => api.patch(`/admin/hotels/${hotelId}/`, data);
+
+export const deleteAdminHotel = (hotelId) => api.delete(`/admin/hotels/${hotelId}/`);
+
+export const getAdminTransport = () => api.get('/admin/transport/');
+
+export const createAdminTransport = (data) => api.post('/admin/transport/', data);
+
+export const getAdminTransportDetail = (transportId) => api.get(`/admin/transport/${transportId}/`);
+
+export const updateAdminTransport = (transportId, data) => api.patch(`/admin/transport/${transportId}/`, data);
+
+export const deleteAdminTransport = (transportId) => api.delete(`/admin/transport/${transportId}/`);
+
 export default api;

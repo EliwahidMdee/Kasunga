@@ -1,5 +1,5 @@
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate, Link } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, NavLink } from 'react-router-dom';
 import { useAuth } from './context/AuthContext';
 import './App.css';
 
@@ -10,17 +10,31 @@ import DashboardPage from './pages/DashboardPage';
 import DestinationDetails from './pages/DestinationDetails';
 import ProfilePage from './pages/ProfilePage';
 import BudgetPage from './pages/BudgetPage';
+import AdminDestinationsPage from './pages/AdminDestinationsPage';
+import AdminHotelsPage from './pages/AdminHotelsPage';
+import AdminTransportPage from './pages/AdminTransportPage';
 
 // Components
 import UserPreferencesForm from './components/UserPreferencesForm';
 
 const App = () => {
-  const { isAuthenticated, logout } = useAuth();
+  const { isAuthenticated, logout, isAdmin } = useAuth();
 
   // Protected Route Component
   const ProtectedRoute = ({ children }) => {
     if (!isAuthenticated) {
       return <Navigate to="/login" replace />;
+    }
+    return children;
+  };
+
+  // Admin-only Route Component
+  const AdminRoute = ({ children }) => {
+    if (!isAuthenticated) {
+      return <Navigate to="/login" replace />;
+    }
+    if (!isAdmin) {
+      return <Navigate to="/dashboard" replace />;
     }
     return children;
   };
@@ -38,22 +52,42 @@ const App = () => {
             <h1>✈️ Traveline</h1>
           </div>
           <nav className="sidebar-nav">
-            <Link to="/dashboard" className="nav-link">
+            <NavLink to="/dashboard" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
               <span className="nav-icon">🏠</span>
               <span className="nav-text">Dashboard</span>
-            </Link>
-            <Link to="/preferences" className="nav-link">
+            </NavLink>
+            <NavLink to="/preferences" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
               <span className="nav-icon">⚙️</span>
               <span className="nav-text">Preferences</span>
-            </Link>
-            <Link to="/budget" className="nav-link">
+            </NavLink>
+            <NavLink to="/budget" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
               <span className="nav-icon">💰</span>
               <span className="nav-text">Budget</span>
-            </Link>
-            <Link to="/profile" className="nav-link">
+            </NavLink>
+            <NavLink to="/profile" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
               <span className="nav-icon">👤</span>
               <span className="nav-text">Profile</span>
-            </Link>
+            </NavLink>
+
+            {/* Admin Section */}
+            {isAdmin && (
+              <>
+                <div className="sidebar-divider"></div>
+                <div className="sidebar-section-title">Admin</div>
+                <NavLink to="/admin/destinations" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+                  <span className="nav-icon">📍</span>
+                  <span className="nav-text">Destinations</span>
+                </NavLink>
+                <NavLink to="/admin/hotels" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+                  <span className="nav-icon">🏨</span>
+                  <span className="nav-text">Hotels</span>
+                </NavLink>
+                <NavLink to="/admin/transport" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+                  <span className="nav-icon">🚗</span>
+                  <span className="nav-text">Transport</span>
+                </NavLink>
+              </>
+            )}
           </nav>
           <div className="sidebar-footer">
             <button onClick={handleLogout} className="btn-logout">
@@ -146,6 +180,38 @@ const App = () => {
                 <ProfilePage />
               </Layout>
             </ProtectedRoute>
+          }
+        />
+
+        {/* Admin Routes */}
+        <Route
+          path="/admin/destinations"
+          element={
+            <AdminRoute>
+              <Layout>
+                <AdminDestinationsPage />
+              </Layout>
+            </AdminRoute>
+          }
+        />
+        <Route
+          path="/admin/hotels"
+          element={
+            <AdminRoute>
+              <Layout>
+                <AdminHotelsPage />
+              </Layout>
+            </AdminRoute>
+          }
+        />
+        <Route
+          path="/admin/transport"
+          element={
+            <AdminRoute>
+              <Layout>
+                <AdminTransportPage />
+              </Layout>
+            </AdminRoute>
           }
         />
 

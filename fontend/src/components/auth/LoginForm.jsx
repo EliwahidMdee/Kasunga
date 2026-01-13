@@ -21,10 +21,10 @@ const LoginForm = ({ onSuccess, onSwitchToRegister }) => {
 
     try {
       const res = await loginUser(credentials.username, credentials.password);
-      const { token, user_id, username } = res.data;
+      const { token, user_id, username, is_staff, is_superuser } = res.data;
       setToken(token);
       setUser(username, user_id);
-      login(token, username, user_id);
+      login(token, username, user_id, is_staff, is_superuser);
       onSuccess?.();
     } catch (err) {
       setError(err.response?.data?.error || 'Invalid credentials');

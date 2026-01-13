@@ -6,6 +6,8 @@ const AuthContext = createContext(null);
 export const AuthProvider = ({ children }) => {
   const [token, setTokenState] = useState(getToken());
   const [user, setUserState] = useState(getUser());
+  const [isAdmin, setIsAdmin] = useState(localStorage.getItem('is_admin') === 'true');
+  const [isSuperuser, setIsSuperuser] = useState(localStorage.getItem('is_superuser') === 'true');
 
   useEffect(() => {
     if (token) {
@@ -13,17 +15,25 @@ export const AuthProvider = ({ children }) => {
     }
   }, [token]);
 
-  const login = (tokenValue, username, userId) => {
+  const login = (tokenValue, username, userId, isStaff = false, isSuperuserStatus = false) => {
     setTokenState(tokenValue);
     setToken(tokenValue);
     setUser(username, userId);
     setUserState({ username, userId });
+    setIsAdmin(isStaff);
+    setIsSuperuser(isSuperuserStatus);
+    localStorage.setItem('is_admin', isStaff);
+    localStorage.setItem('is_superuser', isSuperuserStatus);
   };
 
   const logout = () => {
     clearAll();
     setTokenState(null);
     setUserState({ username: null, userId: null });
+    setIsAdmin(false);
+    setIsSuperuser(false);
+    localStorage.removeItem('is_admin');
+    localStorage.removeItem('is_superuser');
   };
 
   const value = {
@@ -32,6 +42,8 @@ export const AuthProvider = ({ children }) => {
     login,
     logout,
     isAuthenticated: !!token,
+    isAdmin,
+    isSuperuser,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

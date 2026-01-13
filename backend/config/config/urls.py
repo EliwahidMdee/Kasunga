@@ -58,6 +58,14 @@ urlpatterns = [
     path('api/admin/travel-plans/', views.admin_all_travel_plans, name='admin_all_travel_plans'),
     path('api/admin/preferences-tracking/', views.admin_preferences_tracking, name='admin_preferences_tracking'),
     
+    # Admin content management endpoints
+    path('api/admin/destinations/', views.admin_manage_destinations, name='admin_manage_destinations'),
+    path('api/admin/destinations/<int:destination_id>/', views.admin_destination_detail, name='admin_destination_detail'),
+    path('api/admin/hotels/', views.admin_manage_hotels, name='admin_manage_hotels'),
+    path('api/admin/hotels/<int:hotel_id>/', views.admin_hotel_detail, name='admin_hotel_detail'),
+    path('api/admin/transport/', views.admin_manage_transport, name='admin_manage_transport'),
+    path('api/admin/transport/<int:transport_id>/', views.admin_transport_detail, name='admin_transport_detail'),
+    
     # Django REST Framework browsable API auth
     path('api-auth/', include('rest_framework.urls')),
 ]

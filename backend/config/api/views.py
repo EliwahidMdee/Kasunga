@@ -196,6 +196,8 @@ def login_view(request):
         'user_id': user.id,
         'username': user.username,
         'email': user.email,
+        'is_staff': user.is_staff,
+        'is_superuser': user.is_superuser,
         'message': 'Login successful'
     })
 
@@ -1033,3 +1035,184 @@ def admin_toggle_user_status(request, user_id):
         'message': f'User {user.username} is now {"active" if user.is_active else "inactive"}',
         'is_active': user.is_active
     })
+
+# ==================== ADMIN MANAGEMENT - CONTENT CRUD ====================
+
+@api_view(['GET', 'POST'])
+@permission_classes([IsAdminUser])
+def admin_manage_destinations(request):
+    """
+    List all destinations or create a new destination (admin only)
+    """
+    if request.method == 'GET':
+        destinations = Destination.objects.all().order_by('-created_at')
+        serializer = DestinationSerializer(destinations, many=True)
+        return Response({
+            'count': destinations.count(),
+            'destinations': serializer.data
+        })
+    
+    elif request.method == 'POST':
+        serializer = DestinationSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response({
+                'message': 'Destination created successfully',
+                'destination': serializer.data
+            }, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['GET', 'PUT', 'PATCH', 'DELETE'])
+@permission_classes([IsAdminUser])
+def admin_destination_detail(request, destination_id):
+    """
+    Get, update, or delete a specific destination (admin only)
+    """
+    try:
+        destination = Destination.objects.get(id=destination_id)
+    except Destination.DoesNotExist:
+        return Response(
+            {'error': 'Destination not found'},
+            status=status.HTTP_404_NOT_FOUND
+        )
+    
+    if request.method == 'GET':
+        serializer = DestinationSerializer(destination)
+        return Response(serializer.data)
+    
+    elif request.method in ['PUT', 'PATCH']:
+        partial = request.method == 'PATCH'
+        serializer = DestinationSerializer(destination, data=request.data, partial=partial)
+        if serializer.is_valid():
+            serializer.save()
+            return Response({
+                'message': 'Destination updated successfully',
+                'destination': serializer.data
+            })
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+    elif request.method == 'DELETE':
+        name = destination.name
+        destination.delete()
+        return Response({'message': f'Destination "{name}" deleted successfully'})
+
+
+@api_view(['GET', 'POST'])
+@permission_classes([IsAdminUser])
+def admin_manage_hotels(request):
+    """
+    List all hotels or create a new hotel (admin only)
+    """
+    if request.method == 'GET':
+        hotels = Hotel.objects.all().order_by('-created_at')
+        serializer = HotelSerializer(hotels, many=True)
+        return Response({
+            'count': hotels.count(),
+            'hotels': serializer.data
+        })
+    
+    elif request.method == 'POST':
+        serializer = HotelSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response({
+                'message': 'Hotel created successfully',
+                'hotel': serializer.data
+            }, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['GET', 'PUT', 'PATCH', 'DELETE'])
+@permission_classes([IsAdminUser])
+def admin_hotel_detail(request, hotel_id):
+    """
+    Get, update, or delete a specific hotel (admin only)
+    """
+    try:
+        hotel = Hotel.objects.get(id=hotel_id)
+    except Hotel.DoesNotExist:
+        return Response(
+            {'error': 'Hotel not found'},
+            status=status.HTTP_404_NOT_FOUND
+        )
+    
+    if request.method == 'GET':
+        serializer = HotelSerializer(hotel)
+        return Response(serializer.data)
+    
+    elif request.method in ['PUT', 'PATCH']:
+        partial = request.method == 'PATCH'
+        serializer = HotelSerializer(hotel, data=request.data, partial=partial)
+        if serializer.is_valid():
+            serializer.save()
+            return Response({
+                'message': 'Hotel updated successfully',
+                'hotel': serializer.data
+            })
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+    elif request.method == 'DELETE':
+        name = hotel.name
+        hotel.delete()
+        return Response({'message': f'Hotel "{name}" deleted successfully'})
+
+
+@api_view(['GET', 'POST'])
+@permission_classes([IsAdminUser])
+def admin_manage_transport(request):
+    """
+    List all transport options or create a new one (admin only)
+    """
+    if request.method == 'GET':
+        transports = Transport.objects.all().order_by('-created_at')
+        serializer = TransportSerializer(transports, many=True)
+        return Response({
+            'count': transports.count(),
+            'transports': serializer.data
+        })
+    
+    elif request.method == 'POST':
+        serializer = TransportSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response({
+                'message': 'Transport option created successfully',
+                'transport': serializer.data
+            }, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['GET', 'PUT', 'PATCH', 'DELETE'])
+@permission_classes([IsAdminUser])
+def admin_transport_detail(request, transport_id):
+    """
+    Get, update, or delete a specific transport option (admin only)
+    """
+    try:
+        transport = Transport.objects.get(id=transport_id)
+    except Transport.DoesNotExist:
+        return Response(
+            {'error': 'Transport not found'},
+            status=status.HTTP_404_NOT_FOUND
+        )
+    
+    if request.method == 'GET':
+        serializer = TransportSerializer(transport)
+        return Response(serializer.data)
+    
+    elif request.method in ['PUT', 'PATCH']:
+        partial = request.method == 'PATCH'
+        serializer = TransportSerializer(transport, data=request.data, partial=partial)
+        if serializer.is_valid():
+            serializer.save()
+            return Response({
+                'message': 'Transport updated successfully',
+                'transport': serializer.data
+            })
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+    elif request.method == 'DELETE':
+        name = transport.name
+        transport.delete()
+        return Response({'message': f'Transport "{name}" deleted successfully'})
