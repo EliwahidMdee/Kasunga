@@ -7,13 +7,13 @@ from django.contrib.auth import authenticate
 from django.contrib.auth.models import User
 from django.db.models import Count, Sum, Avg, Q
 from api.models import (
-    UserPreference, Destination, Hotel, Transport, 
+    UserPreference, Destination, DestinationImage, Hotel, Transport, 
     TravelPlan, Itinerary
 )
 from api.serializers import (
     UserSerializer, UserPreferenceSerializer, DestinationSerializer,
-    HotelSerializer, TransportSerializer, TravelPlanSerializer,
-    ItinerarySerializer
+    DestinationImageSerializer, HotelSerializer, TransportSerializer, 
+    TravelPlanSerializer, ItinerarySerializer
 )
 from datetime import timedelta, datetime
 from decimal import Decimal
@@ -28,16 +28,25 @@ class RecommendationEngine:
     """
     
     @staticmethod
-    def recommend_destinations(budget, interest, country=None):
+    def recommend_destinations(budget=None, interest=None, country=None, budget_min=None, budget_max=None, objective=None, location=None):
         """
-        Rule 1: Recommend destinations based on budget and interest
-        IF budget = Low → show budget-friendly destinations
-        IF interest = Beach → show beach destinations
+        Enhanced Rule: Recommend destinations based on multiple criteria
+        IF budget_min/budget_max provided → filter by budget range
+        IF interest provided → show matching category destinations
         IF country is specified → filter by country
+        IF objective provided → filter by objectives_supported
+        IF location provided → filter by location
+        Only show active destinations
         """
-        query = Destination.objects.all()
+        query = Destination.objects.filter(is_active=True)
         
-        # Rule: Match budget level
+        # Rule: Match budget range if specified
+        if budget_min is not None:
+            query = query.filter(budget_min__gte=budget_min)
+        if budget_max is not None:
+            query = query.filter(budget_max__lte=budget_max)
+        
+        # Rule: Match budget level (fallback)
         if budget:
             query = query.filter(budget_level=budget)
         
@@ -47,7 +56,15 @@ class RecommendationEngine:
         
         # Rule: Filter by country if specified
         if country:
-            query = query.filter(country=country)
+            query = query.filter(country__icontains=country)
+            
+        # Rule: Filter by location if specified
+        if location:
+            query = query.filter(Q(location__icontains=location) | Q(city__icontains=location) | Q(country__icontains=location))
+        
+        # Rule: Filter by objective if specified
+        if objective:
+            query = query.filter(objectives_supported__contains=[objective])
         
         return query
     
@@ -320,24 +337,48 @@ class UserPreferenceViewSet(viewsets.ModelViewSet):
 
 class DestinationViewSet(viewsets.ReadOnlyModelViewSet):
     """Destination management and recommendations"""
-    queryset = Destination.objects.all()
+    queryset = Destination.objects.filter(is_active=True)
     serializer_class = DestinationSerializer
     permission_classes = [AllowAny]
+    
+    def get_queryset(self):
+        """Override to only show active destinations"""
+        return Destination.objects.filter(is_active=True)
     
     @action(detail=False, methods=['get'])
     def recommended(self, request):
         """
         Get recommended destinations based on user preferences
-        Query params: budget, interest, country
+        Query params: budget, interest, country, budget_min, budget_max, objective, location
         """
         budget = request.query_params.get('budget')
         interest = request.query_params.get('interest')
         country = request.query_params.get('country')
+        budget_min = request.query_params.get('budget_min')
+        budget_max = request.query_params.get('budget_max')
+        objective = request.query_params.get('objective')
+        location = request.query_params.get('location')
+        
+        # Convert budget strings to Decimal if provided
+        if budget_min:
+            try:
+                budget_min = Decimal(budget_min)
+            except:
+                budget_min = None
+        if budget_max:
+            try:
+                budget_max = Decimal(budget_max)
+            except:
+                budget_max = None
         
         destinations = RecommendationEngine.recommend_destinations(
             budget=budget,
             interest=interest,
-            country=country
+            country=country,
+            budget_min=budget_min,
+            budget_max=budget_max,
+            objective=objective,
+            location=location
         )
         
         serializer = self.get_serializer(destinations, many=True)
@@ -549,6 +590,20 @@ class ItineraryViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         # Users see itineraries for their travel plans
         return Itinerary.objects.filter(travel_plan__user=self.request.user)
+
+
+class DestinationImageViewSet(viewsets.ReadOnlyModelViewSet):
+    """Destination images management"""
+    queryset = DestinationImage.objects.all()
+    serializer_class = DestinationImageSerializer
+    permission_classes = [AllowAny]
+    
+    def get_queryset(self):
+        # Filter by destination if provided
+        destination_id = self.request.query_params.get('destination_id')
+        if destination_id:
+            return DestinationImage.objects.filter(destination_id=destination_id)
+        return DestinationImage.objects.all()
 
 
 # ==================== BUDGET TRACKING VIEWS ====================

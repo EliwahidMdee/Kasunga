@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from django.contrib.auth.models import User
 from api.models import (
-    UserPreference, Destination, Hotel, Transport, 
+    UserPreference, Destination, DestinationImage, Hotel, Transport, 
     TravelPlan, Itinerary
 )
 
@@ -24,17 +24,31 @@ class UserSerializer(serializers.ModelSerializer):
 class UserPreferenceSerializer(serializers.ModelSerializer):
     class Meta:
         model = UserPreference
-        fields = ['id', 'user', 'budget', 'interest', 'num_travelers', 'created_at']
+        fields = [
+            'id', 'user', 'budget', 'budget_min', 'budget_max', 
+            'interest', 'location', 'objective', 'accommodation_type',
+            'num_travelers', 'created_at', 'updated_at'
+        ]
+
+
+# Destination Image Serializer
+class DestinationImageSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = DestinationImage
+        fields = ['id', 'destination', 'image_url', 'caption', 'is_primary', 'created_at']
 
 
 # Destination Serializer
 class DestinationSerializer(serializers.ModelSerializer):
+    images = DestinationImageSerializer(many=True, read_only=True)
+    
     class Meta:
         model = Destination
         fields = [
-            'id', 'name', 'country', 'city', 'description', 
-            'image_url', 'category', 'best_season', 'avg_temperature',
-            'budget_level', 'created_at'
+            'id', 'name', 'country', 'city', 'description', 'location',
+            'image_url', 'images', 'category', 'best_season', 'avg_temperature',
+            'budget_level', 'budget_min', 'budget_max', 'objectives_supported',
+            'is_active', 'booking_url', 'created_at'
         ]
 
 

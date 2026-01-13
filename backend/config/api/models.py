@@ -19,9 +19,31 @@ class UserPreference(models.Model):
         ('culture', 'Culture'),
     ]
     
+    OBJECTIVE_CHOICES = [
+        ('leisure', 'Leisure'),
+        ('adventure', 'Adventure'),
+        ('honeymoon', 'Honeymoon'),
+        ('business', 'Business'),
+        ('family', 'Family'),
+    ]
+    
+    ACCOMMODATION_CHOICES = [
+        ('hotel', 'Hotel'),
+        ('resort', 'Resort'),
+        ('apartment', 'Apartment'),
+        ('villa', 'Villa'),
+        ('hostel', 'Hostel'),
+        ('guesthouse', 'Guest House'),
+    ]
+    
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='preference')
     budget = models.CharField(max_length=10, choices=BUDGET_CHOICES, default='medium')
+    budget_min = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, help_text="Minimum budget in USD")
+    budget_max = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, help_text="Maximum budget in USD")
     interest = models.CharField(max_length=20, choices=INTEREST_CHOICES, default='beach')
+    location = models.CharField(max_length=200, blank=True, help_text="Preferred location")
+    objective = models.CharField(max_length=20, choices=OBJECTIVE_CHOICES, default='leisure', help_text="Travel objective")
+    accommodation_type = models.CharField(max_length=20, choices=ACCOMMODATION_CHOICES, default='hotel', help_text="Preferred accommodation type")
     num_travelers = models.IntegerField(default=1)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -32,10 +54,19 @@ class UserPreference(models.Model):
 
 # Destination Model
 class Destination(models.Model):
+    OBJECTIVE_CHOICES = [
+        ('leisure', 'Leisure'),
+        ('adventure', 'Adventure'),
+        ('honeymoon', 'Honeymoon'),
+        ('business', 'Business'),
+        ('family', 'Family'),
+    ]
+    
     name = models.CharField(max_length=200)
     country = models.CharField(max_length=100)
     city = models.CharField(max_length=100)
     description = models.TextField()
+    location = models.CharField(max_length=200, blank=True, default='', help_text="Full location description")
     image_url = models.URLField(blank=True, null=True)
     category = models.CharField(max_length=50, choices=[
         ('beach', 'Beach'),
@@ -52,10 +83,30 @@ class Destination(models.Model):
         ('medium', 'Medium'),
         ('high', 'High'),
     ])
+    budget_min = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, help_text="Minimum budget in USD")
+    budget_max = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, help_text="Maximum budget in USD")
+    objectives_supported = models.JSONField(default=list, blank=True, help_text="List of supported travel objectives")
+    is_active = models.BooleanField(default=True, help_text="Is this destination active/available?")
+    booking_url = models.URLField(blank=True, null=True, help_text="External booking link")
     created_at = models.DateTimeField(auto_now_add=True)
     
     def __str__(self):
         return f"{self.name}, {self.country}"
+
+
+# Destination Image Model - for multiple images per destination
+class DestinationImage(models.Model):
+    destination = models.ForeignKey(Destination, on_delete=models.CASCADE, related_name='images')
+    image_url = models.URLField(help_text="Image URL")
+    caption = models.CharField(max_length=200, blank=True, help_text="Image caption")
+    is_primary = models.BooleanField(default=False, help_text="Is this the primary/featured image?")
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        ordering = ['-is_primary', 'created_at']
+    
+    def __str__(self):
+        return f"Image for {self.destination.name}"
 
 
 # Hotel Model
