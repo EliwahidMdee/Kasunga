@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import * as api from '../services/api';
+import { useAuth } from '../context/AuthContext';
 import './UserPreferencesForm.css';
 
 const UserPreferencesForm = ({ onSave }) => {
+  const { user } = useAuth();
   const [preferences, setPreferences] = useState({
     budget: 'medium',
     budget_min: '',
@@ -71,8 +73,12 @@ const UserPreferencesForm = ({ onSave }) => {
         await api.updateUserPreferences(existingPreferences.id, dataToSend);
         setSuccess('Preferences updated successfully!');
       } else {
-        // Create new preferences
-        const userId = localStorage.getItem('userId');
+        // Create new preferences - use userId from auth context
+        const userId = user?.userId || localStorage.getItem('userId');
+        if (!userId) {
+          setError('User ID not found. Please log in again.');
+          return;
+        }
         await api.createUserPreferences({ user: userId, ...dataToSend });
         setSuccess('Preferences saved successfully!');
       }

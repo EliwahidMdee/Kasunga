@@ -24,7 +24,7 @@ const DashboardPage = () => {
         preferences = prefResponse.data;
         setUserPreferences(preferences);
       } catch (err) {
-        console.log('No preferences found');
+        console.warn('No user preferences found');
       }
 
       // Load all destinations
@@ -36,20 +36,20 @@ const DashboardPage = () => {
         const hotelResponse = await api.getHotels();
         setHotels(hotelResponse.data.slice(0, 6)); // Show first 6
       } catch (err) {
-        console.log('Failed to load hotels');
+        console.warn('Failed to load hotels:', err);
       }
 
       // If user has preferences, load recommended destinations
       if (preferences) {
         try {
-          const recResponse = await api.getRecommendedDestinations(
-            preferences.budget,
-            preferences.interest,
-            preferences.location
-          );
+          const recResponse = await api.getRecommendedDestinations({
+            budget: preferences.budget,
+            interest: preferences.interest,
+            location: preferences.location
+          });
           setRecommendedDestinations(recResponse.data.recommendations.slice(0, 6));
         } catch (err) {
-          console.log('Failed to load recommendations');
+          console.warn('Failed to load recommendations:', err);
         }
       }
     } catch (err) {

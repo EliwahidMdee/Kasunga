@@ -9,6 +9,9 @@ const DestinationDetails = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [selectedImage, setSelectedImage] = useState(null);
+  
+  // Fallback image constant
+  const FALLBACK_IMAGE = 'https://images.unsplash.com/photo-1488646953014-85cb44e25828?w=800';
 
   useEffect(() => {
     const fetchDestination = async () => {
@@ -60,10 +63,10 @@ const DestinationDetails = () => {
       <div className="image-gallery">
         <div className="main-image">
           <img
-            src={selectedImage || 'https://images.unsplash.com/photo-1488646953014-85cb44e25828?w=800'}
+            src={selectedImage || FALLBACK_IMAGE}
             alt={destination.name}
             onError={(e) => {
-              e.target.src = 'https://images.unsplash.com/photo-488646953014-85cb44e25828?w=800';
+              e.target.src = FALLBACK_IMAGE;
             }}
           />
         </div>
