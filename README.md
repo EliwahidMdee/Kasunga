@@ -13,6 +13,17 @@ This is a **rule-based travel planning and recommendation system** built with Dj
 
 ---
 
+## 📄 Documentation
+
+### Software Requirements Specification (SRS)
+A comprehensive IEEE 830-1998 compliant SRS document is available for this project:
+
+- **Generate SRS**: Run `python3 generate_srs.py` to create the document
+- **View Guide**: See [SRS_GENERATION_GUIDE.md](SRS_GENERATION_GUIDE.md) for details
+- **Features**: Complete with use cases, user stories, feasibility study, budget analysis, and PlantUML diagrams
+
+---
+
 ## System Architecture
 
 ### Backend (Django REST API)
